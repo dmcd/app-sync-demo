@@ -1,0 +1,14 @@
+# serverless.yml
+app-sync-demo:
+  component: '@sls-next/serverless-component@1.18.0'
+  inputs:
+    bucketName: @ENV_NAME-app-sync-demo-nextjs
+    description: 'Edge Lambda for @ENV_NAME-app-sync-demo-nextjs'
+    name:
+      defaultLambda: @ENV_NAME-app-sync-demo-nextjs
+      apiLambda: @ENV_NAME-app-sync-demo-nextjs
+    build:
+      env:
+        NEXT_PUBLIC_GRAPHQL_ENDPOINT: @GRAPHQL_ENDPOINT
+        NEXT_PUBLIC_AWS_REGION: @AWS_REGION
+        NEXT_PUBLIC_APPSYNC_API_KEY: @APPSYNC_API_KEY

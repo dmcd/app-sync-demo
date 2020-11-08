@@ -1,0 +1,46 @@
+input CreatePostInput {
+  userId: ID!
+  title: String
+  description: String
+  sourceUrl: String
+}
+
+"""
+A Post
+"""
+type Post {
+  id: ID!
+  userId: ID!
+  title: String
+  description: String
+  createdAt: String
+  updatedAt: String
+  sourceUrl: String
+}
+
+"""
+A list of Posts
+"""
+type Posts {
+  nextToken: String
+  items: [Post]
+}
+
+type Query {
+  """
+  Return a list of posts
+  """
+  listPosts(limit: Int, nextToken: String): Posts
+}
+
+type Mutation {
+  """
+  Create a new post
+  """
+  createPost(post: CreatePostInput!): Post
+
+  """
+  Delete a post by ID
+  """
+  deletePost(id: ID!): Boolean
+}

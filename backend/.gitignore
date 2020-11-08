@@ -1,0 +1,18 @@
+# generated typescript files
+build
+
+# generated type definitions
+*.d.ts
+
+# libraries
+node_modules
+
+# CDK asset staging directory
+.cdk.staging
+cdk.out
+
+# env files
+.env.dev
+.env
+
+.cache

@@ -1,0 +1,83 @@
+name: Main
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Extract branch name
+        shell: bash
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+        id: extract_branch
+
+      - name: Set env name
+        run: echo "ENV_NAME=${{ steps.extract_branch.outputs.branch }}" >> $GITHUB_ENV
+
+      - name: node_modules cache
+        uses: actions/cache@v2
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Nextjs cache
+        uses: actions/cache@v2
+        with:
+          path: ${{ github.workspace }}/.next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Serverless cache
+        uses: actions/cache@v2
+        with:
+          path: ${{ github.workspace }}/.serverless
+          key: ${{ steps.extract_branch.outputs.branch }}-serverless-${{ hashFiles('frontend/serverless.yml') }}
+
+      - name: Backend
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          cd backend
+          npm ci
+          npm run lint
+          npm run build
+          npm run test
+          npm prune --production
+          zip -r backend.zip node_modules/*
+          cd build
+          zip -ur ../backend.zip *
+          cd ..
+          npm ci
+          npx cdk deploy "*" -c envName=$ENV_NAME --require-approval=never --outputs-file=stack-outputs.json
+
+      # Remove appsync-api-key once cognito is setup
+      - name: Set backend outputs
+        run: |
+          cd backend
+          echo "::set-output name=graphql-url::$(cat stack-outputs.json | jq ".\"${{ steps.extract_branch.outputs.branch }}-Appsync\".GraphQLURL")"
+          echo "::set-output name=stack-region::$(cat stack-outputs.json | jq ".\"${{ steps.extract_branch.outputs.branch }}-Appsync\".StackRegion")"
+          echo "::set-output name=appsync-api-key::$(cat stack-outputs.json | jq ".\"${{ steps.extract_branch.outputs.branch }}-Appsync\".AppSyncAPIKey")"
+        id: backend
+
+      - name: Serverless AWS authentication
+        run: npx serverless --component=serverless-next config credentials --provider aws --key ${{ secrets.AWS_ACCESS_KEY_ID }} --secret ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Frontend
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          cd frontend
+          npm ci
+          npm run lint
+          npm run build
+          sed -i "s/@ENV_NAME/$ENV_NAME/g" serverless.yml
+          sed -i "s|@GRAPHQL_ENDPOINT|${{ steps.backend.outputs.graphql-url }}|g" serverless.yml
+          sed -i "s/@AWS_REGION/${{ steps.backend.outputs.stack-region }}/g" serverless.yml
+          sed -i "s|@APPSYNC_API_KEY|${{ steps.backend.outputs.appsync-api-key }}|g" serverless.yml
+          npx serverless 

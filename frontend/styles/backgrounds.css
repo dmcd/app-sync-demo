@@ -1,0 +1,5 @@
+.hover\:bg-gray-50:hover {
+  --bg-opacity: 1;
+  background-color: #f9fafb;
+  background-color: rgba(249, 250, 251, var(--bg-opacity));
+}
